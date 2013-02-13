@@ -58,7 +58,9 @@ namespace UICalendar
 		}
 
 		public DateTime CurrentMonthYear;
-		public DateTime CurrentDate { get; internal set; }
+		public DateTime CurrentDate { get; internal set; } // which date is "shown"
+		public DateTime SelectedDate { get; set; }         // which date is selected/highlighted
+		
 		public bool ShowToolBar;
 
 		private UIScrollView _scrollView;
@@ -85,7 +87,7 @@ namespace UICalendar
 		public CalendarMonthView (DateTime currentDate, bool showToolBar) : base(new RectangleF (0, 0, 320, 260))
 		{
 			ShowToolBar = showToolBar;
-			if (currentDate.Year < 2010)
+			if (currentDate == DateTime.MinValue)
 				CurrentDate = DateTime.Today;
 			else
 				CurrentDate = currentDate;
@@ -94,7 +96,7 @@ namespace UICalendar
 		}
 		public CalendarMonthView (DateTime currentDate) : base(new RectangleF (0, 0, 320, 260))
 		{
-			if (currentDate.Year < 2010)
+			if (currentDate == DateTime.MinValue)
 				CurrentDate = DateTime.Today;
 			else
 				CurrentDate = currentDate;
@@ -105,7 +107,7 @@ namespace UICalendar
 		{
 			Console.WriteLine ("Date Received");
 			MarkedDay = markedDays;
-			if (currentDate.Year < 2010)
+			if (currentDate == DateTime.MinValue)
 				CurrentDate = DateTime.Today;
 			else
 				CurrentDate = currentDate;
@@ -223,6 +225,15 @@ namespace UICalendar
 			var oldFrame = _scrollView.Frame;
 			_scrollView.Frame = new RectangleF (_scrollView.Frame.Location, new SizeF (_scrollView.Frame.Width, (gridToMove.Lines + 1) * 44));
 			_scrollView.ContentSize = _scrollView.Frame.Size;
+			
+			// adjust my frame bounds to fit the new scroll view size...
+			{
+				var myNewFrame = this.Frame;
+				myNewFrame.Height = _scrollView.Frame.Location.Y + _scrollView.Frame.Height;
+				this.Frame = myNewFrame;
+			}
+			
+			
 			if (ShowToolBar) {
 				var toolRect = toolbar.Frame;
 				toolRect.Y = _scrollView.Frame.Y + _scrollView.Frame.Height;
@@ -231,14 +242,14 @@ namespace UICalendar
 			
 			SetNeedsDisplay ();
 			
-			if (animated)
+			if (animated) {
 				UIView.CommitAnimations ();
+			}
 			
 			_monthGridView = gridToMove;
 			
 			UserInteractionEnabled = true;
-			if (oldFrame != _scrollView.Frame && SizeChanged != null)
-			{
+			if (oldFrame != _scrollView.Frame && SizeChanged != null) {
 				this.Frame = new RectangleF(this.Frame.Location,Size);	
 				SizeChanged ();
 			}
@@ -248,21 +259,26 @@ namespace UICalendar
 		public void MoveCalendarMonths (DateTime date, bool animated)
 		{
 			bool upwards = false;
-			if (date.Month == CurrentMonthYear.Month && date.Year == CurrentMonthYear.Year)
-				animated = false; else if (date > CurrentMonthYear)
+			if (date.Month == CurrentMonthYear.Month && date.Year == CurrentMonthYear.Year) {
+				animated = false; 
+			} else if (date > CurrentMonthYear) {
 				upwards = true;
+			}	
 			CurrentMonthYear = new DateTime (date.Year, date.Month, 1);
-			if (MonthChanged != null)
+			if (MonthChanged != null) {
 				MonthChanged (CurrentMonthYear);
+			}
 			UserInteractionEnabled = false;
 			
 			var gridToMove = CreateNewGrid (CurrentMonthYear);
 			var pointsToMove = (upwards ? 0 + _monthGridView.Lines : 0 - _monthGridView.Lines) * 44;
 			
-			if (upwards && gridToMove.weekdayOfFirst == 0)
+			if (upwards && gridToMove.weekdayOfFirst == 0) {
 				pointsToMove += 44;
-			if (!upwards && _monthGridView.weekdayOfFirst == 0)
+			}
+			if (!upwards && _monthGridView.weekdayOfFirst == 0) {
 				pointsToMove -= 44;
+			}
 			
 			gridToMove.Frame = new RectangleF (new PointF (0, pointsToMove), gridToMove.Frame.Size);
 			
@@ -281,7 +297,9 @@ namespace UICalendar
 			_shadow.Frame = new RectangleF (new PointF (0, gridToMove.Lines * 44 - 88), _shadow.Frame.Size);
 			
 			var oldFrame = _scrollView.Frame;
-			_scrollView.Frame = new RectangleF (_scrollView.Frame.Location, new SizeF (_scrollView.Frame.Width, (gridToMove.Lines + 1) * 44));
+			_scrollView.Frame = 
+				new RectangleF (_scrollView.Frame.Location, 
+								new SizeF (_scrollView.Frame.Width, (gridToMove.Lines + 1) * 44));
 			_scrollView.ContentSize = _scrollView.Frame.Size;
 			if (ShowToolBar) {
 				var toolRect = toolbar.Frame;
@@ -291,14 +309,14 @@ namespace UICalendar
 			
 			SetNeedsDisplay ();
 			
-			if (animated)
+			if (animated) {
 				UIView.CommitAnimations ();
+			}
 			
 			_monthGridView = gridToMove;
 			
 			UserInteractionEnabled = true;
-			if (oldFrame != _scrollView.Frame && SizeChanged != null)
-			{
+			if (oldFrame != _scrollView.Frame && SizeChanged != null) {
 				this.Frame = new RectangleF(this.Frame.Location,Size);	
 				SizeChanged ();
 			}
@@ -306,7 +324,7 @@ namespace UICalendar
 
 		private MonthGridView CreateNewGrid (DateTime date)
 		{
-			var grid = new MonthGridView (this, date, CurrentDate);
+			var grid = new MonthGridView (this, date, SelectedDate);
 			grid.BuildGrid ();
 			grid.Frame = new RectangleF (0, 0, 320, 400);
 			return grid;
@@ -378,20 +396,24 @@ namespace UICalendar
 		private CalendarMonthView _calendarMonthView;
 
 		private readonly DateTime _currentDay;
-		public DateTime SelectedDate;
+		public 	DateTime SelectedDate;
 		private DateTime _currentMonth;
+		
 		protected readonly IList<CalendarDayView> _dayTiles = new List<CalendarDayView> ();
 		public int Lines { get; set; }
 		protected CalendarDayView SelectedDayView { get; set; }
-		public int weekdayOfFirst;
+		
+		public 				int 		weekdayOfFirst;
+		
 		public IList<DateTime> Marks { get; set; }
 
-		public MonthGridView (CalendarMonthView calendarMonthView, DateTime month, DateTime day)
+		public MonthGridView (CalendarMonthView calendarMonthView, DateTime monthDisplayed, DateTime selectedDay)
 		{
-			SelectedDate = day;
 			_calendarMonthView = calendarMonthView;
 			_currentDay = DateTime.Today;
-			_currentMonth = month.Date;
+			_currentMonth = new DateTime(monthDisplayed.Year, monthDisplayed.Month, 1);
+			
+			SelectedDate = selectedDay; // this day will be highlighted/selected only if in the current month! 
 		}
 
 		public void BuildGrid ()
@@ -405,15 +427,19 @@ namespace UICalendar
 			var daysInPreviousMonth = DateTime.DaysInMonth (previousMonth.Year, previousMonth.Month);
 			var daysInMonth = DateTime.DaysInMonth (_currentMonth.Year, _currentMonth.Month);
 			weekdayOfFirst = (int)_currentMonth.DayOfWeek;
-			var lead = daysInPreviousMonth - (weekdayOfFirst - 1);
 			
 			// build last month's days
 			for (int i = 1; i <= weekdayOfFirst; i++) {
-				var viewDay = new DateTime (_currentMonth.Year, _currentMonth.Month, i);
-				var dayView = new CalendarDayView { Frame = new RectangleF ((i - 1) * 46 - 1, 0, 47, 45), Text = lead.ToString (), Marked = _calendarMonthView.isDayMarker (viewDay) };
+				var viewDay = new DateTime(_currentMonth.Year, _currentMonth.Month, 1).AddDays(-weekdayOfFirst+i-1);
+				var dayView = new CalendarDayView 
+						{ 
+							Frame 		= new RectangleF ((i - 1) * 46 - 1, 0, 47, 45), 
+							Date 		= viewDay,
+							Selected 	= (SelectedDate == viewDay),	
+							Marked 		= _calendarMonthView.isDayMarker (viewDay),
+						};
 				AddSubview (dayView);
 				_dayTiles.Add (dayView);
-				lead++;
 			}
 			
 			var position = weekdayOfFirst + 1;
@@ -422,10 +448,19 @@ namespace UICalendar
 			// current month
 			for (int i = 1; i <= daysInMonth; i++) {
 				var viewDay = new DateTime (_currentMonth.Year, _currentMonth.Month, i);
-				var dayView = new CalendarDayView { Frame = new RectangleF ((position - 1) * 46 - 1, line * 44, 47, 45), Today = (_currentDay.Date == viewDay.Date), Text = i.ToString (), Active = true, Tag = i, Marked = _calendarMonthView.isDayMarker (viewDay), Selected = (SelectedDate.Day == i) };
+				var dayView = new CalendarDayView 
+					{ 
+						Frame     = new RectangleF ((position - 1) * 46 - 1, line * 44, 47, 45), 
+						Today     = (_currentDay.Date == viewDay.Date), 
+						Date	  = viewDay,
+						Active 	  = true, 
+						Marked    = _calendarMonthView.isDayMarker (viewDay), 
+						Selected 	= (SelectedDate == viewDay),
+				};
 				
-				if (dayView.Selected)
+				if (dayView.Selected) {
 					SelectedDayView = dayView;
+				}
 				
 				AddSubview (dayView);
 				_dayTiles.Add (dayView);
@@ -440,12 +475,19 @@ namespace UICalendar
 			//next month
 			if (position != 1) {
 				int dayCounter = 1;
+				var viewDay = new DateTime (_currentMonth.Year, _currentMonth.Month + 1, 1);
 				for (int i = position; i < 8; i++) {
-					var viewDay = new DateTime (_currentMonth.Year, _currentMonth.Month, i);
-					var dayView = new CalendarDayView { Frame = new RectangleF ((i - 1) * 46 - 1, line * 44, 47, 45), Text = dayCounter.ToString (), Marked = _calendarMonthView.isDayMarker (viewDay) };
+					var dayView = new CalendarDayView 
+						{ 
+							Frame 		= new RectangleF ((i - 1) * 46 - 1, line * 44, 47, 45), 
+							Date		= viewDay,
+							Marked 	 	= _calendarMonthView.isDayMarker (viewDay),
+							Selected 	= (SelectedDate == viewDay),
+						};
 					AddSubview (dayView);
 					_dayTiles.Add (dayView);
 					dayCounter++;
+					viewDay = viewDay.AddDays(1);
 				}
 			}
 			
@@ -453,17 +495,18 @@ namespace UICalendar
 			
 			Lines = (position == 1 ? line - 1 : line);
 			
-			if (SelectedDayView != null)
+			if (SelectedDayView != null) {
 				this.BringSubviewToFront (SelectedDayView);
+			}
 		}
 
 		public override void TouchesBegan (NSSet touches, UIEvent evt)
 		{
 			base.TouchesBegan (touches, evt);
 			if (SelectDayView ((UITouch)touches.AnyObject)) {
-				SelectedDate = new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag);
-				if (_calendarMonthView.OnDateSelected != null)
-					_calendarMonthView.OnDateSelected (new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag));
+				if (_calendarMonthView.OnDateSelected != null) {
+					_calendarMonthView.OnDateSelected (SelectedDate);
+				}
 			}
 		}
 
@@ -471,19 +514,21 @@ namespace UICalendar
 		{
 			base.TouchesMoved (touches, evt);
 			if (SelectDayView ((UITouch)touches.AnyObject)) {
-				SelectedDate = new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag);
-				if (_calendarMonthView.OnDateSelected != null)
-					_calendarMonthView.OnDateSelected (new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag));
+				if (_calendarMonthView.OnDateSelected != null) {
+					_calendarMonthView.OnDateSelected (SelectedDate);
+				}
 			}
 		}
 
 		public override void TouchesEnded (NSSet touches, UIEvent evt)
 		{
 			base.TouchesEnded (touches, evt);
-			if (_calendarMonthView.OnFinishedDateSelection == null)
+			if (_calendarMonthView.OnFinishedDateSelection == null) {
 				return;
-			SelectedDate = new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag);
-			_calendarMonthView.OnFinishedDateSelection (new DateTime (_currentMonth.Year, _currentMonth.Month, SelectedDayView.Tag));
+			}	
+			if (_calendarMonthView.OnFinishedDateSelection != null) {
+				_calendarMonthView.OnFinishedDateSelection (SelectedDate);
+			}
 		}
 
 		private bool SelectDayView (UITouch touch)
@@ -491,44 +536,57 @@ namespace UICalendar
 			var p = touch.LocationInView (this);
 			
 			int index = ((int)p.Y / 44) * 7 + ((int)p.X / 46);
-			if (index < 0 || index >= _dayTiles.Count)
+			if (index < 0 || index >= _dayTiles.Count) {
 				return false;
+			}
 			
+			// shortcut if they clicked on the already selected day view
 			var newSelectedDayView = _dayTiles[index];
-			if (newSelectedDayView == SelectedDayView)
+			if (newSelectedDayView == SelectedDayView) {
 				return false;
+			}
 			
+			// unselect the old day view
+			if (SelectedDayView != null) {
+				SelectedDayView.Selected = false;
+			}
+			
+			// select the new day view
+			SelectedDayView = newSelectedDayView;
+			SelectedDate = _calendarMonthView.SelectedDate = SelectedDayView.Date;
+			
+			// if we are still in the same month, make it so.
+			this.BringSubviewToFront (newSelectedDayView);
+			newSelectedDayView.Selected = true;
+			newSelectedDayView.SetNeedsDisplay();
+			// SetNeedsDisplay ();
+			
+			// check to see if we are leaving the current month
 			if (!newSelectedDayView.Active && touch.Phase != UITouchPhase.Moved) {
-				var day = int.Parse (newSelectedDayView.Text);
-				if (day > 15)
+				if (newSelectedDayView.Date.Month < _currentMonth.Month) {
 					_calendarMonthView.MoveCalendarMonths (false, true);
-				else
+				} else {
 					_calendarMonthView.MoveCalendarMonths (true, true);
-				return false;
+				}
+				return true;
 			} else if (!newSelectedDayView.Active) {
 				return false;
 			}
 			
-			SelectedDayView.Selected = false;
-			this.BringSubviewToFront (newSelectedDayView);
-			newSelectedDayView.Selected = true;
 			
-			SelectedDayView = newSelectedDayView;
-			SetNeedsDisplay ();
+			
 			return true;
 		}
 	}
 
 	internal class CalendarDayView : UIView
 	{
-		string _text;
 		bool _active, _today, _selected, _marked;
-		public string Text {
-			get { return _text; }
-			set {
-				_text = value;
-				SetNeedsDisplay ();
-			}
+		DateTime _date;
+		
+		public DateTime Date {
+			get { return _date; }
+			set { _date = value; SetNeedsDisplay(); }
 		}
 		public bool Active {
 			get { return _active; }
@@ -561,37 +619,54 @@ namespace UICalendar
 
 		public override void Draw (RectangleF rect)
 		{
-			UIImage img;
-			UIColor color;
+			UIImage img = null;
+			UIColor cellColor = this.BackgroundColor ?? UIColor.White;
+			UIColor textColor = UIColor.Black;
 			
-			if (!Active) {
-				color = UIColor.FromRGBA (0.576f, 0.608f, 0.647f, 1f);
+			var ctx = UIGraphics.GetCurrentContext ();
+			
+			if (Selected) {
+				textColor = UIColor.White;
+				img = Images.datecellselected;
+			} else if (!Active) {
+				textColor = UIColor.FromRGBA (0.576f, 0.608f, 0.647f, 1f);
 				img = Images.dateCell;
 			} else if (Today && Selected) {
-				color = UIColor.White;
+				textColor = UIColor.White;
 				img = Images.todayselected;
 			} else if (Today) {
-				color = UIColor.White;
+				textColor = UIColor.White;
 				img = Images.today;
-			} else if (Selected) {
-				color = UIColor.White;
-				img = Images.datecellselected;
 			} else {
 				//color = UIColor.DarkTextColor;
-				color = UIColor.FromRGBA (0.275f, 0.341f, 0.412f, 1f);
-				img = Images.dateCell;
+				textColor = UIColor.FromRGBA (0.275f, 0.341f, 0.412f, 1f);
+				// img = Images.dateCell;
 			}
-			img.Draw (new PointF (0, 0));
-			color.SetColor ();
-			DrawString (Text, RectangleF.Inflate (Bounds, 4, -8), UIFont.BoldSystemFontOfSize (22), UILineBreakMode.WordWrap, UITextAlignment.Center);
+			if (img != null) {
+				img.Draw (this.Bounds);
+			} else {
+				ctx.SetFillColor(cellColor.CGColor);
+				ctx.SetStrokeColor(UIColor.Black.CGColor);
+				ctx.FillRect(this.Bounds);
+				ctx.SetLineWidth(1.0f);
+				ctx.StrokeRect(this.Bounds);
+				ctx.StrokePath();
+			}
+			textColor.SetColor ();
+			// string title = Date.Month.ToString() + ":" + Date.Day.ToString();
+			string title = Date.Day.ToString();
+			DrawString (title, RectangleF.Inflate (Bounds, 4, -8), UIFont.BoldSystemFontOfSize (22), UILineBreakMode.WordWrap, UITextAlignment.Center);
 			
+			// draw "something on this day" mark... 
 			if (Marked) {
 				var context = UIGraphics.GetCurrentContext ();
-				if (Selected || Today)
-					context.SetRGBFillColor (1, 1, 1, 1); else if (!Active)
+				if (Selected || Today) {
+					context.SetRGBFillColor (1, 1, 1, 1); 
+				} else if (!Active) {
 					UIColor.LightGray.SetColor ();
-				else
+				} else {
 					context.SetRGBFillColor (75 / 255f, 92 / 255f, 111 / 255f, 1);
+				}
 				context.SetLineWidth (0);
 				context.AddEllipseInRect (new RectangleF (Frame.Size.Width / 2 - 2, 45 - 10, 4, 4));
 				context.FillPath ();
